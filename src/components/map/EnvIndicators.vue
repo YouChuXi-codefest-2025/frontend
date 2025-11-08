@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { fetchTempDiffForecast, fetchHeatForecast, type TempDiffForecastResponse, type HeatForecastResponse } from '@/api/indicators'
+import { sendHeatInjuryAlert, sendTemperatureDifferenceAlert } from '@/services/notificationService'
 
 interface IndicatorItem {
   id: string
@@ -82,6 +83,11 @@ watch(
           const tValue = tNext ? (extractIndex(tNext, ['temp_diff_index', 'temperature_difference_index', 'index', 'value'])) : undefined
           indicators.value = indicators.value.map(i => i.id === 'delta' ? { ...i, value: (tValue ?? '—') } : i)
           labelFromTemp = [tData.city, tData.district].filter(Boolean).join(' ')
+          
+          // 發送溫差通知（指數 >= 4，約 8°C 溫差）
+          if (typeof tValue === 'number' && tValue >= 4) {
+            sendTemperatureDifferenceAlert(tValue * 2, tValue).catch(console.error)
+          }
         }
 
         // 熱傷害指數（heat）
@@ -92,6 +98,11 @@ watch(
           const hValue = hNext ? (extractIndex(hNext, ['heat_injury_index', 'heat_index', 'index', 'value'])) : undefined
           indicators.value = indicators.value.map(i => i.id === 'heat' ? { ...i, value: (hValue ?? '—') } : i)
           labelFromHeat = [hData.city, hData.district].filter(Boolean).join(' ')
+          
+          // 發送熱傷害通知（指數 >= 28）
+          if (typeof hValue === 'number' && hValue >= 28) {
+            sendHeatInjuryAlert(hValue).catch(console.error)
+          }
         }
 
         // 始終更新地區標籤（原本只在空時更新造成不會隨移動改變）
