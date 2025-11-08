@@ -2,45 +2,36 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
+// 元件：底部抽屜、圖層切換按鈕、圖層選擇面板、篩選按鈕列、地點列表
 import BottomSheet from './molecules/BottomSheet.vue'
 import LayerToggleButton from './molecules/LayerToggleButton.vue'
-import type { LayerType } from '@/types/mapData'
-import PointMarkers from './map/PointMarkers.vue'
-import PolygonRegions from './map/PolygonRegions.vue'
 import LayerSelector from './map/LayerSelector.vue'
 import FilterButtons from './map/FilterButtons.vue'
 import LocationList from './map/LocationList.vue'
-import { mockPolygonRegions, filterButtons, allLocations } from '@/data/mockMapData'
-import type { LayerType, FilterType, PointArea } from '@/types/mapData'
+// 資料與型別：篩選按鈕設定與所有點位資料
+import { filterButtons, allLocations } from '@/data/mockMapData'
+import type { FilterType, PointArea } from '@/types/mapData'
 
+// 地圖容器與實例
 const mapContainer = ref<HTMLDivElement | null>(null)
 let mapInstance: mapboxgl.Map | null = null
 
-const map = computed(() => mapInstance)
-
-// Bottom sheet state
+// 抽屜顯示狀態（圖層 / 篩選）
 const showLayerSheet = ref(false)
 const showFilterSheet = ref(false)
 
-// Active layer state
-const activeLayer = ref<LayerType>('none')
-
-// Filter state
+// 篩選狀態與衍生資料
 const activeFilter = ref<FilterType | null>(null)
-
-// Filtered locations based on active filter
-const filteredLocations = computed(() => {
+const filteredLocations = computed<PointArea[]>(() => {
   if (!activeFilter.value) return []
   return allLocations.filter(location => location.type === activeFilter.value)
 })
-
-// Active filter button label
 const activeFilterLabel = computed(() => {
   if (!activeFilter.value) return ''
   return filterButtons.find(btn => btn.id === activeFilter.value)?.label || ''
 })
 
-// Initialize map
+// 地圖初始化（載入樣式與 MRT 路線）
 onMounted(() => {
   const token = import.meta.env.VITE_MAPBOX_API_KEY
   if (!token) {
@@ -116,23 +107,12 @@ onMounted(() => {
   })
 })
 
-// Toggle layer sheet
+// 事件：切換圖層抽屜
 const toggleLayerSheet = () => {
   showLayerSheet.value = !showLayerSheet.value
 }
 
-// Handle layer selection
-const handleSelectLayer = (layer: 'points' | 'regions') => {
-  if (activeLayer.value === layer) {
-    // Toggle off
-    activeLayer.value = 'none'
-  } else {
-    // Show selected layer
-    activeLayer.value = layer
-  }
-}
-
-// Handle filter selection
+// 事件：選擇篩選（同一個則關閉）
 const handleSelectFilter = (filter: FilterType) => {
   if (activeFilter.value === filter) {
     // Toggle off
@@ -145,7 +125,7 @@ const handleSelectFilter = (filter: FilterType) => {
   }
 }
 
-// Handle location selection
+// 事件：選擇地點後飛行並關閉篩選抽屜
 const handleSelectLocation = (location: PointArea) => {
   if (mapInstance) {
     mapInstance.flyTo({
@@ -158,6 +138,7 @@ const handleSelectLocation = (location: PointArea) => {
   }
 }
 
+// 卸載：移除地圖實例避免記憶體洩漏
 onUnmounted(() => {
   if (mapInstance) {
     mapInstance.remove()
@@ -168,69 +149,29 @@ onUnmounted(() => {
 
 <template>
   <div class="relative w-full h-full">
+    <!-- 地圖主容器 -->
     <div ref="mapContainer" class="w-full h-full"></div>
 
-    <!-- Filter Buttons (Top) -->
+    <!-- 篩選按鈕列（左上） -->
     <FilterButtons
       :filters="filterButtons"
       :active-filter="activeFilter"
       @select-filter="handleSelectFilter"
     />
 
-    <!-- Filter Buttons (Top) -->
-    <FilterButtons
-      :filters="filterButtons"
-      :active-filter="activeFilter"
-      @select-filter="handleSelectFilter"
-    />
+    <!-- 圖層抽屜觸發按鈕（右上） -->
+    <LayerToggleButton :active="showLayerSheet" @click="toggleLayerSheet" />
 
-    <!-- Layer Toggle Button (Top Right) extracted component -->
-    <LayerToggleButton
-      :active="activeLayer !== 'none'"
-      @click="toggleLayerSheet"
-    />
-
-    <!-- Bottom Sheet with LayerSelector content -->
-    >
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width="24"
-        height="24"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      >
-        <polygon points="12 2 2 7 12 12 22 7 12 2"/>
-        <polyline points="2 17 12 22 22 17"/>
-        <polyline points="2 12 12 17 22 12"/>
-      </svg>
-    </button>
-
-    <!-- Map Layers -->
-    <PointMarkers
-      :map="map"
-      :points="filteredLocations"
-      :visible="activeFilter !== null"
-    />
-    <PolygonRegions
-      :map="map"
-      :regions="mockPolygonRegions"
-      :visible="activeLayer === 'regions'"
-    />
-
-    <!-- Bottom Sheet for Layer Selection -->
+    <!-- 圖層選擇抽屜 -->
     <BottomSheet v-model:isShow="showLayerSheet">
       <LayerSelector />
     </BottomSheet>
 
-    <!-- Bottom Sheet for Filter Locations -->
+    <!-- 篩選結果地點抽屜 -->
     <BottomSheet v-model:isShow="showFilterSheet">
       <LocationList
         :locations="filteredLocations"
-        :title="activeFilterLabel"
+        :title="activeFilterLabel ? activeFilterLabel : '未選擇篩選'"
         @select-location="handleSelectLocation"
       />
     </BottomSheet>
