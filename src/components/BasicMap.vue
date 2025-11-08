@@ -3,6 +3,8 @@ import { onMounted, onUnmounted, ref, computed } from 'vue'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import BottomSheet from './molecules/BottomSheet.vue'
+import LayerToggleButton from './molecules/LayerToggleButton.vue'
+import type { LayerType } from '@/types/mapData'
 import PointMarkers from './map/PointMarkers.vue'
 import PolygonRegions from './map/PolygonRegions.vue'
 import LayerSelector from './map/LayerSelector.vue'
@@ -175,11 +177,20 @@ onUnmounted(() => {
       @select-filter="handleSelectFilter"
     />
 
-    <!-- Layer Toggle Button (Top Right) -->
-    <button
-      class="absolute top-4 right-4 w-12 h-12 rounded-full bg-white border-none shadow-md cursor-pointer flex items-center justify-center text-[#475259] transition-all duration-200 z-[100] hover:shadow-lg hover:scale-105"
-      :class="{ 'bg-[#5AB4C5] text-white': activeLayer !== 'none' }"
+    <!-- Filter Buttons (Top) -->
+    <FilterButtons
+      :filters="filterButtons"
+      :active-filter="activeFilter"
+      @select-filter="handleSelectFilter"
+    />
+
+    <!-- Layer Toggle Button (Top Right) extracted component -->
+    <LayerToggleButton
+      :active="activeLayer !== 'none'"
       @click="toggleLayerSheet"
+    />
+
+    <!-- Bottom Sheet with LayerSelector content -->
     >
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -212,11 +223,7 @@ onUnmounted(() => {
 
     <!-- Bottom Sheet for Layer Selection -->
     <BottomSheet v-model:isShow="showLayerSheet">
-      <LayerSelector
-        :active-layer="activeLayer"
-        @select-layer="handleSelectLayer"
-        @close="showLayerSheet = false"
-      />
+      <LayerSelector />
     </BottomSheet>
 
     <!-- Bottom Sheet for Filter Locations -->

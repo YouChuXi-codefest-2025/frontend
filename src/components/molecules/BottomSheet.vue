@@ -2,7 +2,7 @@
   <transition name="bottom-sheet">
     <div
       v-if="isShow"
-      class="fixed z-[9998] top-0 left-0 w-full h-full bg-black/50 flex items-end transition-opacity duration-300"
+      class="fixed z-50 top-0 left-0 w-full h-full bg-black/50 flex items-end transition-opacity duration-300"
       @click="handleMaskClick"
     >
       <div
