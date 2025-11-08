@@ -2,9 +2,10 @@
 import { onMounted, onUnmounted, ref, computed } from 'vue'
 import mapboxgl from 'mapbox-gl'
 import 'mapbox-gl/dist/mapbox-gl.css'
-// 元件：底部抽屜、圖層切換按鈕、圖層選擇面板、篩選按鈕列、地點列表、點位標記
+// 元件：底部抽屜、圖層切換按鈕、圖層選擇面板、篩選按鈕列、地點列表、點位標記、定位按鈕
 import BottomSheet from './molecules/BottomSheet.vue'
 import LayerToggleButton from './molecules/LayerToggleButton.vue'
+import LocationButton from './molecules/LocationButton.vue'
 import LayerSelector from './map/LayerSelector.vue'
 import FilterButtons from './map/FilterButtons.vue'
 import LocationList from './map/LocationList.vue'
@@ -13,6 +14,8 @@ import PointMarkers from './map/PointMarkers.vue'
 import { filterButtons, combineAllLocations } from '@/data/mockMapData'
 import { fetchColdSpots } from '@/api/sites'
 import type { FilterType, PointArea } from '@/types/mapData'
+// 定位工具
+import { locateUser } from '@/utils/locationUtils'
 
 // 地圖容器與實例
 const mapContainer = ref<HTMLDivElement | null>(null)
@@ -40,6 +43,10 @@ const activeFilterLabel = computed(() => {
   if (!activeFilter.value) return ''
   return filterButtons.find(btn => btn.id === activeFilter.value)?.label || ''
 })
+
+// 定位相關狀態
+const isLocating = ref(false)
+const userLocationMarker = ref<mapboxgl.Marker | null>(null)
 
 // 載入涼適點數據
 const loadColdSpots = async () => {
@@ -127,6 +134,8 @@ onMounted(async () => {
         },
       })
     }
+    // 地圖載入完成後自動定位
+    locateUser(mapInstance.value, userLocationMarker, isLocating)
   })
 })
 
@@ -161,8 +170,20 @@ const handleSelectLocation = (location: PointArea) => {
   }
 }
 
+// 事件：定位到使用者位置
+const handleLocateUser = () => {
+  locateUser(mapInstance.value, userLocationMarker, isLocating)
+}
+
 // 卸載：移除地圖實例避免記憶體洩漏
 onUnmounted(() => {
+  // 移除使用者位置標記
+  if (userLocationMarker.value) {
+    userLocationMarker.value.remove()
+    userLocationMarker.value = null
+  }
+
+  // 移除地圖實例
   if (mapInstance.value) {
     mapInstance.value.remove()
     mapInstance.value = null
@@ -191,6 +212,9 @@ onUnmounted(() => {
 
     <!-- 圖層抽屜觸發按鈕（右上） -->
     <LayerToggleButton :active="showLayerSheet" @click="toggleLayerSheet" />
+
+    <!-- 定位按鈕（右下） -->
+    <LocationButton :is-locating="isLocating" @click="handleLocateUser" />
 
     <!-- 圖層選擇抽屜 -->
     <BottomSheet v-model:isShow="showLayerSheet">
