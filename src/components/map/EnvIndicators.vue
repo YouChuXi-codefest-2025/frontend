@@ -8,6 +8,8 @@ interface IndicatorItem {
   label: string
   value: string | number
   icon?: 'heat' | 'aqi' | 'delta'
+  level?: string // PM2.5 等級或其他指標分級說明
+  color?: string // 對應顏色（小圓點用）
 }
 
 interface Props {
@@ -102,15 +104,29 @@ watch(
           }
         }
 
-        // AQI (即時) 指標處理：直接取 aqi_pm25 或 pm25_ugm3；若有分類 aqi_category 可一起顯示
+        // AQI (即時) 指標處理：改為僅讀取 pm25_ugm3（μg/m³）
         if (aqiRes.status === 'fulfilled') {
           const aData = aqiRes.value
-          const aqiValue = typeof aData.aqi_pm25 === 'number' ? aData.aqi_pm25
-            : typeof aData.pm25_ugm3 === 'number' ? aData.pm25_ugm3
-            : '—'
-          const category = typeof aData.aqi_category === 'string' ? aData.aqi_category : ''
-          const display = category ? `${aqiValue} (${category})` : aqiValue
-          indicators.value = indicators.value.map(i => i.id === 'aqi' ? { ...i, value: display } : i)
+          const pmRaw = typeof (aData as any).pm25_ugm3 === 'number' ? (aData as any).pm25_ugm3 : undefined
+
+          // 分級規則（依照需求列出的區間）
+          const classifyPm = (pm: number): { level: string; color: string } => {
+            if (pm <= 12.4) return { level: '良好', color: '#22C55E' } // 綠
+            if (pm <= 30.4) return { level: '普通', color: '#EAB308' } // 黃
+            if (pm <= 50.4) return { level: '對敏感族群不健康', color: '#F97316' } // 橘
+            if (pm <= 125.4) return { level: '對所有族群不健康', color: '#DC2626' } // 紅
+            if (pm <= 225.4) return { level: '非常不健康', color: '#9333EA' } // 紫
+            if (pm <= 500.4) return { level: '危害', color: '#654321' } // 咖啡
+            return { level: '異常', color: '#6B7280' }
+          }
+
+          if (typeof pmRaw === 'number') {
+            const pm = Number(pmRaw.toFixed(1)) // 保留 1 位小數
+            const { level, color } = classifyPm(pm)
+            indicators.value = indicators.value.map(i => i.id === 'aqi' ? { ...i, value: pm, level, color } : i)
+          } else {
+            indicators.value = indicators.value.map(i => i.id === 'aqi' ? { ...i, value: '—', level: undefined, color: undefined } : i)
+          }
         }
 
         // 始終更新地區標籤（原本只在空時更新造成不會隨移動改變）
@@ -163,6 +179,11 @@ watch(
       <div class="flex items-baseline gap-2">
         <span class="text-xs text-white/80 tracking-wide">{{ item.label }}</span>
         <span class="text-sm font-semibold">{{ item.value }}</span>
+        <!-- PM2.5 顏色指示圓點 + 等級文字（僅 AQI 顯示） -->
+        <span v-if="item.id === 'aqi' && item.color" class="flex items-center gap-1">
+          <span :style="{ backgroundColor: item.color }" class="inline-block w-3 h-3 rounded-full border border-white/30" :aria-label="item.level"></span>
+          <span class="text-[10px] text-white/60" v-if="item.level">{{ item.level }}</span>
+        </span>
       </div>
     </div>
   </div>
