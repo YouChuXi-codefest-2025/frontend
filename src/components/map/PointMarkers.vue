@@ -65,6 +65,17 @@ const updateClusterStyle = () => {
   map.setPaintProperty(CLUSTER_LAYER_ID, 'circle-color', colorExpr)
 }
 
+// 安全轉義字串避免 XSS（名稱等動態字串插入 HTML）
+const escapeHtml = (str: string | undefined | null): string => {
+  if (!str) return ''
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
 // 將點位轉成 GeoJSON FeatureCollection
 const buildGeoJSON = (): GeoJSON.FeatureCollection => {
   return {
@@ -199,10 +210,15 @@ const ensureSourceAndLayers = () => {
     const f = features[0]
     const p: any = f.properties
     const color = typeColorMap[p.type as PointArea['type']] || '#5AB4C5'
+    const coords = ((f as any).geometry as any).coordinates as [number, number]
+    const [lon, lat] = coords
+    const gmapsUrl = `https://www.google.com/maps/dir/?api=1&origin=Current+Location&destination=${lat},${lon}`
     let html = `<div style="padding:12px;min-width:200px;max-width:280px;">`
     html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">`
-    html += `<h3 style="margin:0;font-weight:bold;color:${color};font-size:14px;">${p.name}</h3>`
-    if (p.location_type) html += `<span style=\"font-size:12px;color:#666;\">${p.location_type}</span>`
+    html += `<h3 style=\"margin:0;font-weight:bold;font-size:14px;\">`
+    html += `<a href=\"${gmapsUrl}\" target=\"_blank\" rel=\"noopener\" style=\"color:${color};text-decoration:underline;\">${escapeHtml(p.name)}</a>`
+    html += `</h3>`
+    if (p.location_type) html += `<span style=\"font-size:12px;color:#666;\">${escapeHtml(p.location_type)}</span>`
     html += `</div>`
     const detail = (label: string, value: string) => value ? `<div style=\"display:flex;gap:6px;font-size:12px;color:#555;\"><span style=\"min-width:38px;font-weight:500;\">${label}</span><span style=\"white-space:pre-line;\">${value}</span></div>` : ''
     html += detail('地址：', p.address)
@@ -212,7 +228,7 @@ const ensureSourceAndLayers = () => {
     html += detail('備註：', p.notes)
     html += `</div>`
     new mapboxgl.Popup({ offset: 20 })
-      .setLngLat(((f as any).geometry as any).coordinates)
+      .setLngLat(coords)
       .setHTML(html)
       .addTo(map)
   }
