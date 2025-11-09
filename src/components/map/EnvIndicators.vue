@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
-import { fetchTempDiffForecast, fetchHeatForecast, type TempDiffForecastResponse, type HeatForecastResponse } from '@/api/indicators'
+import { fetchTempDiffForecast, fetchHeatForecast, fetchAqiPm25, type TempDiffForecastResponse, type HeatForecastResponse, type AqiPm25Response } from '@/api/indicators'
 
 interface IndicatorItem {
   id: string
@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
   items: () => ([
     { id: 'delta', label: '溫差提醒指數', value: '—', icon: 'delta' },
     { id: 'heat', label: '熱傷害指數', value: '—', icon: 'heat' },
-    { id: 'aqi', label: 'AQI', value: '—', icon: 'aqi' }
+    { id: 'aqi', label: 'PM 2.5', value: '—', icon: 'aqi' }
   ])
 })
 
@@ -65,14 +65,11 @@ watch(
       const now = new Date()
       try {
         // 並行請求：溫差與熱傷害
-        const [tempRes, heatRes] = await Promise.allSettled<
-          [PromiseFulfilledResult<TempDiffForecastResponse> | PromiseRejectedResult,
-           PromiseFulfilledResult<HeatForecastResponse> | PromiseRejectedResult]
-        >([
-          // 包一層 Promise.resolve 以滿足 TS 推斷
-          Promise.resolve(fetchTempDiffForecast(center.lat, center.lng, signal)) as any,
-          Promise.resolve(fetchHeatForecast(center.lat, center.lng, signal)) as any
-        ]) as unknown as [PromiseSettledResult<TempDiffForecastResponse>, PromiseSettledResult<HeatForecastResponse>]
+        const [tempRes, heatRes, aqiRes] = await Promise.allSettled([
+          fetchTempDiffForecast(center.lat, center.lng, signal),
+          fetchHeatForecast(center.lat, center.lng, signal),
+          fetchAqiPm25(center.lat, center.lng, signal)
+        ]) as [PromiseSettledResult<TempDiffForecastResponse>, PromiseSettledResult<HeatForecastResponse>, PromiseSettledResult<AqiPm25Response>]
 
         // 溫差提醒指數（delta）
         let labelFromTemp: string | undefined
@@ -94,8 +91,19 @@ watch(
           labelFromHeat = [hData.city, hData.district].filter(Boolean).join(' ')
         }
 
+        // AQI (即時) 指標處理：直接取 aqi_pm25 或 pm25_ugm3；若有分類 aqi_category 可一起顯示
+        if (aqiRes.status === 'fulfilled') {
+          const aData = aqiRes.value
+          const aqiValue = typeof aData.aqi_pm25 === 'number' ? aData.aqi_pm25
+            : typeof aData.pm25_ugm3 === 'number' ? aData.pm25_ugm3
+            : '—'
+          const category = typeof aData.aqi_category === 'string' ? aData.aqi_category : ''
+          const display = category ? `${aqiValue} (${category})` : aqiValue
+          indicators.value = indicators.value.map(i => i.id === 'aqi' ? { ...i, value: display } : i)
+        }
+
         // 始終更新地區標籤（原本只在空時更新造成不會隨移動改變）
-        const newLabel = labelFromTemp || labelFromHeat || ''
+        const newLabel = labelFromTemp || labelFromHeat || locationLabel.value
         locationLabel.value = newLabel
       } catch (_) {
         // 靜默處理；保留既有顯示

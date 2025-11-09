@@ -26,6 +26,22 @@ export interface TempDiffForecastResponse {
   forecasts: TempDiffForecastItem[]
 }
 
+// AQI / PM2.5 即時資料
+export interface AqiPm25Response {
+  aqi_category?: string
+  aqi_pm25?: number
+  pm25_ugm3?: number
+  bucket?: { lat_bucket?: number; lon_bucket?: number }
+  cams_reference_time?: string
+  grid_point?: { lat?: number; lon?: number }
+  input?: { lat?: number; lon?: number }
+  note?: string
+  slot_ts_taipei?: string
+  slot_ts_utc?: string
+  source?: string
+  [key: string]: unknown
+}
+
 /**
  * 取得溫差提醒相關（熱傷害）逐時預報
  * @param lat 緯度
@@ -67,5 +83,25 @@ export async function fetchTempDiffForecast(
     throw new Error(`TempDiff forecast API failed: ${res.status}`)
   }
   const data = (await res.json()) as TempDiffForecastResponse
+  return data
+}
+
+/**
+ * 取得 AQI / PM2.5 即時資料
+ */
+export async function fetchAqiPm25(
+  lat: number,
+  lon: number,
+  signal?: AbortSignal
+): Promise<AqiPm25Response> {
+  if (!INDICATORS_BASE_URL) {
+    throw new Error('VITE_INDICATORS_BASE_URL is not set')
+  }
+  const url = `${INDICATORS_BASE_URL}/aqi/pm25?lat=${lat.toFixed(6)}&lon=${lon.toFixed(6)}`
+  const res = await fetch(url, { signal })
+  if (!res.ok) {
+    throw new Error(`AQI pm25 API failed: ${res.status}`)
+  }
+  const data = (await res.json()) as AqiPm25Response
   return data
 }
