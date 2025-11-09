@@ -105,6 +105,7 @@ onMounted(async () => {
     minZoom: 6,
     maxZoom: 18,
     dragRotate: false,
+    attributionControl: false, // 禁用 attribution control
     maxBounds: [
       [120.0, 21.8],
       [122.1, 25.4],
@@ -268,3 +269,11 @@ onUnmounted(() => {
     </BottomSheet>
   </div>
 </template>
+
+<style scoped>
+/* 隱藏 Mapbox 左下角的浮水印 */
+:deep(.mapboxgl-ctrl-logo),
+:deep(.mapboxgl-ctrl-attrib) {
+  display: none !important;
+}
+</style>
